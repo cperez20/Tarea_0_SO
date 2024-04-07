@@ -1,5 +1,6 @@
 #include <stdio.h>	// FILE, fopen, fclose, etc.
 #include <stdlib.h> // malloc, calloc, free, etc
+#include <stdbool.h>
 #include "../file_manager/manager.h"
 #include <time.h>
 #include <unistd.h>
@@ -24,9 +25,15 @@ void execute_external_program(char **arguments)
 	}
 }
 
+void timeout_handler(int sig) {
+    printf("Timeout alcanzado. Enviando SIGKILL a todos los procesos restantes.\n");
+    kill(-1, SIGKILL); // Termina todos los procesos hijo restantes
+}
+
 int main(int argc, char const *argv[])
 {
 	/*Lectura del input*/
+	// Formato de lectura /. runner {input} {output} {amount} [{max}]
 	char *file_name = (char *)argv[1];
 	InputFile *input_file = read_file(file_name);
 
@@ -45,8 +52,8 @@ int main(int argc, char const *argv[])
 	for (int i = 0; i < input_file->len; ++i)
 	{
 		char **line = input_file->lines[i];
-		int argc = atoi(line[0]);
-		char **arguments = &line[1];
+		int argc = atoi(line[0]); // Numero de argumentos
+		char **arguments = &line[1]; // Obtiene nombre del ejecutable y argumentos
 
 		printf("%d ", atoi(input_file->lines[i][0]));
 		printf("%s ", input_file->lines[i][1]);
@@ -57,40 +64,48 @@ int main(int argc, char const *argv[])
 
 		printf("\n");
 
-		// Ejecutamos el programa externo si no es un comando "wait all"
-		if (strcmp(arguments[0], "wait") != 0 || strcmp(arguments[1], "all") != 0)
+		// Ejecutamos el programa externo si no es un comando "wait_all"
+		if (strcmp(arguments[0], "wait_all") != 0)
 		{
+			// Si se ha alcanzado el límite de procesos permitidos, esperamos a que termine uno
+			while (amount == 0)
+			{
+				wait(NULL);
+				amount++;
+			}
 			execute_external_program(arguments);
 			amount--; // Decrementamos el contador de procesos permitidos
 		}
 		else
 		{
-			// Comando "wait all"
-			int timeout = atoi(arguments[2]);
+			int timeout = atoi(arguments[1]); // Obtiene el timeout del comando wait_all
+			time_t start_time = time(NULL);
+			pid_t pid;
+			int status;
 
-			// Esperamos hasta que se cumpla el tiempo límite o se terminen todos los procesos
-			start_time = time(NULL);
-			while (amount < 0 && (max < 0 || difftime(time(NULL), start_time) < max))
-			{
-				if (waitpid(-1, NULL, WNOHANG) > 0)
-				{
-					amount++; // Incrementamos el contador de procesos permitidos
+			// Usamos señales para manejar el timeout
+			signal(SIGALRM, timeout_handler);
+			alarm(timeout);
+
+    		while (true) {
+
+				// Espera a cualquier proceso hijo hasta que uno termine o hasta que se alcance el timeout
+				pid = waitpid(-1, &status, 0); // 0 para bloquear hasta que un proceso hijo termine
+
+				if (pid > 0) {
+					// Un proceso hijo ha terminado
+					printf("Proceso %d terminado.\n", pid);
+					amount ++; // Aumentamos el contador de procesos permitidos
+				} else if (pid == -1) {
+					// Error en waitpid o no hay más procesos hijo por esperar
+					break;
 				}
-			}
+    		}
 
-			// Si todavía hay procesos en ejecución después del tiempo límite, los matamos
-			if (amount < 0 && max >= 0)
-			{
-				kill(-1, SIGKILL);
-			}
+    		// Después de alcanzar el timeout, asegúrate de que todos los procesos hijo sean recogidos (evita procesos zombis)
+    		while (waitpid(-1, NULL, 0) > 0);
 		}
 
-		// Si se ha alcanzado el límite de procesos permitidos, esperamos a que termine uno
-		while (amount <= 0)
-		{
-			wait(NULL);
-			amount++;
-		}
 	}
 
 	// Esperamos a que terminen todos los procesos restantes
