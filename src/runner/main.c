@@ -25,12 +25,22 @@ void execute_external_program(char **arguments)
 	}
 }
 
+void sigterm_handler(int sig){
+	printf("10 segs alcanzado. Enviando SIGTERM a todos los procesos restantes.\n");
+	kill(-1, SIGTERM);
+}
+
 // Definimos variable para decidir si la alarma de wait esta activa o no
 bool wait_alarm = false;
 void timeout_handler(int sig) {
 	if(wait_alarm){
 		printf("Timeout alcanzado. Enviando SIGKILL a todos los procesos restantes.\n");
     	kill(-1, SIGKILL); // Termina todos los procesos hijo restantes
+	} else {
+		printf("Max alcanzado. Enviando SIGINT a todos los procesos restantes.\n");
+		kill(-1, SIGINT);
+		signal(SIGALRM, sigterm_handler); // Definimos nueva alarma
+		alarm(10);
 	}
 }
 
@@ -45,6 +55,7 @@ int main(int argc, char const *argv[])
 	// Obtención de parámetros de la línea de comandos
 	char *output_file = (char *)argv[2];
 	int amount = atoi(argv[3]);
+	int original_amount = amount; // Guardamos variable de amount que no cambiara
 	int max = (argc > 4) ? atoi(argv[4]) : -1; // Valor por defecto: tiempo ilimitado
 
 	// Si max tiene un valor distinto de 1 se le asigna ese valor a la alarma 
@@ -128,7 +139,7 @@ int main(int argc, char const *argv[])
 	}
 
 	// Esperamos a que terminen todos los procesos restantes
-	while (amount < 0)
+	while (amount < original_amount)
 	{
 		wait(NULL);
 		amount++;
