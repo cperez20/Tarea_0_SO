@@ -25,10 +25,15 @@ void execute_external_program(char **arguments)
 	}
 }
 
+// Definimos variable para decidir si la alarma de wait esta activa o no
+bool wait_alarm = false;
 void timeout_handler(int sig) {
-    printf("Timeout alcanzado. Enviando SIGKILL a todos los procesos restantes.\n");
-    kill(-1, SIGKILL); // Termina todos los procesos hijo restantes
+	if(wait_alarm){
+		printf("Timeout alcanzado. Enviando SIGKILL a todos los procesos restantes.\n");
+    	kill(-1, SIGKILL); // Termina todos los procesos hijo restantes
+	}
 }
+
 
 int main(int argc, char const *argv[])
 {
@@ -42,9 +47,11 @@ int main(int argc, char const *argv[])
 	int amount = atoi(argv[3]);
 	int max = (argc > 4) ? atoi(argv[4]) : -1; // Valor por defecto: tiempo ilimitado
 
-	// Variables para manejar el tiempo límite
-	time_t start_time;
-	time_t current_time;
+	// Si max tiene un valor distinto de 1 se le asigna ese valor a la alarma 
+	if (max != -1){
+		signal(SIGALRM, timeout_handler);
+		alarm(max); //Configuramos un temporizador
+	}
 
 	/*Mostramos el archivo de input en consola*/
 	// Se itera sobre las lineas del archivo de entrada
@@ -79,13 +86,20 @@ int main(int argc, char const *argv[])
 		else
 		{
 			int timeout = atoi(arguments[1]); // Obtiene el timeout del comando wait_all
-			time_t start_time = time(NULL);
 			pid_t pid;
 			int status;
+			time_t set_time;
 
-			// Usamos señales para manejar el timeout
-			signal(SIGALRM, timeout_handler);
-			alarm(timeout);
+			// Obtén el tiempo restante de la alarma y cancela la alarma actual
+    		unsigned int seconds_left = alarm(0);
+			// Si timeout se va a disparar antes que max se setea esa alarma
+			if (seconds_left > timeout){
+				set_time = time(NULL);
+				alarm(timeout);
+				wait_alarm = true;
+			} else {
+				alarm(seconds_left);
+			}
 
     		while (true) {
 
@@ -101,6 +115,11 @@ int main(int argc, char const *argv[])
 					break;
 				}
     		}
+
+			// Volvemos a setear la alarma global
+			time_t new_seconds = time(NULL) - set_time;
+			alarm(new_seconds);
+			wait_alarm = false;
 
     		// Después de alcanzar el timeout, asegúrate de que todos los procesos hijo sean recogidos (evita procesos zombis)
     		while (waitpid(-1, NULL, 0) > 0);
