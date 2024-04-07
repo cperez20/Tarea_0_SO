@@ -45,7 +45,7 @@ LIB=$(MTH)
 ###############################################################################
 
 # Directorios con elementos de uso común
-COMMON=file_manager
+COMMON=file_manager son_process
 
 # Directorios que serán compilados a un programa
 PROGRAMS=runner schedulesly
