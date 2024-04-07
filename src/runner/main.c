@@ -205,6 +205,7 @@ int main(int argc, char const *argv[])
 
 	fclose(csv_file);
 	input_file_destroy(input_file);
+	processlist_destroy(list);
 
 	return 0;
 }
