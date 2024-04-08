@@ -12,5 +12,5 @@ int main(int argc, char **argv){
     printf("%s: Iniciado...\n", argv[0]);
     printf("%s: String recibido como argumento %s...\n", argv[0], argv[2]);
     while((double)(clock() - begin) / CLOCKS_PER_SEC < min_time);
-    exit(atoi(argv[3]));
+    exit(atoi(argv[4]));
 }

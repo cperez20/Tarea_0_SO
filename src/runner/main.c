@@ -13,6 +13,8 @@
 
 ProcessList* list; // lista que contendra a los procesos hijos
 int list_len = 0;
+int amount;
+int count = 0;
 
 void execute_external_program(char **arguments, bool first_process)
 {
@@ -31,47 +33,63 @@ void execute_external_program(char **arguments, bool first_process)
             exit(EXIT_FAILURE);
         }
 	} else{
-		time_t son_created = time(NULL); // Obtenemos hora de creacion
+		double son_created = clock(); // Obtenemos hora de creacion
 		SonProcess process; // Pedimos memoria para el struct
-		process = (SonProcess){.pid = pid, .executable = arguments[0], .time_created = son_created, .ended = false}; // Inicializamos sus valores
+		process = (SonProcess){.pid = pid, .executable = arguments[0], .time_created = son_created}; // Inicializamos sus valores
 		// Analizamos si debemos inicializar la lista ligada o agregarle un valor
 		if(first_process){
 			list = processlist_init(process);
 		} else {
 			processlist_append(list, process);
 		}
-		list_len ++; //Aumentamos el largo de la lista
+		list_len = list_len + 1; //Aumentamos el largo de la lista
 		}
 }
 
-void child_termination_handler(int sig) {
 
-    int status;
-    pid_t pid;
-	bool break_while = false;
+void ended_handler(pid_t son_pid, int status){
 
-    // Espera a todos los procesos hijos que han terminado y devuelve inmediatamente si no hay ninguno
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-		for (int i = 0; i < list_len; i++){
-			printf("PID while: %d", pid);
+
+	for (int i = 0; i < list_len; i++){
 			SonProcess* son = processlist_at_index(list, i);
-			printf("PID son: %d", son->pid);
-			if(son->pid == pid && son->ended == false){ //Encontramos al proceso que acaba de terminar
-				son->time_ended = time(NULL); //Asignamos valor a ended
-				printf("TIME_ENDED:%ld",son->time_ended);
-				son->ended = true;
+			if(son->pid == son_pid){ //Encontramos al proceso que acaba de terminar
+				son->time_ended = clock(); //Asignamos valor a ended
 				// Asignamos valor a status
 				if (WIFEXITED(status)) {
             		son->status = WEXITSTATUS(status);
 				} else if (WIFSIGNALED(status)) {
             		son->status = WTERMSIG(status);
 					}
-				break_while = true;
 				break;
 			}
 		}
-		if(break_while){
-			break;
+
+}
+
+
+void child_termination_handler(int sig) {
+
+    int status;
+    pid_t pid = waitpid(-1, &status, WUNTRACED);
+	amount = amount + 1;
+	count = count + 1;
+
+
+    // Espera a todos los procesos hijos que han terminado y devuelve inmediatamente si no hay ninguno
+    if (pid > 0) {
+		for (int i = 0; i < list_len; i++){
+			SonProcess* son = processlist_at_index(list, i);
+			if(son->pid == pid){ //Encontramos al proceso que acaba de terminar
+				son->time_ended = clock(); //Asignamos valor a ended
+				// Asignamos valor a status
+				if (WIFEXITED(status)) {
+            		son->status = WEXITSTATUS(status);
+				} else if (WIFSIGNALED(status)) {
+            		son->status = WTERMSIG(status);
+					}
+
+				break;
+			}
 		}
     }
 }
@@ -79,7 +97,7 @@ void child_termination_handler(int sig) {
 void sigterm_handler(int sig){
 	int pid;
 	int status;
-	pid = waitpid(-1, &status, WNOHANG);
+	pid = waitpid(-1, &status, 0);
 	if(pid != 0){
 		printf("10 segs alcanzado. Enviando SIGTERM a todos los procesos restantes.\n");
 		kill(-1, SIGTERM);
@@ -111,7 +129,7 @@ int main(int argc, char const *argv[])
 	// Obtención de parámetros de la línea de comandos
 	char *output_file = (char *)argv[2];
 	FILE *csv_file = fopen(output_file, "w");
-	int amount = atoi(argv[3]);
+	amount = atoi(argv[3]);
 	int original_amount = amount; // Guardamos variable de amount que no cambiara
 	int max = (argc > 4) ? atoi(argv[4]) : -1; // Valor por defecto: tiempo ilimitado
 	bool first_process = true; // Registra si el primer proceso ya empezo (nos sirve para inicializar la lista ligada)
@@ -149,12 +167,12 @@ int main(int argc, char const *argv[])
 			while (amount == 0)
 			{
 				wait(NULL);
-				amount++;
+				amount = amount + 1;
 			}
 			execute_external_program(arguments, first_process);
 			first_process = false;
 			
-			amount--; // Decrementamos el contador de procesos permitidos
+			amount = amount - 1; // Decrementamos el contador de procesos permitidos
 		}
 		else
 		{
@@ -182,7 +200,6 @@ int main(int argc, char const *argv[])
 				if (pid > 0) {
 					// Un proceso hijo ha terminado
 					printf("Proceso %d terminado.\n", pid);
-					amount ++; // Aumentamos el contador de procesos permitidos
 				} else if (pid == -1) {
 					// Error en waitpid o no hay más procesos hijo por esperar
 					break;
@@ -204,29 +221,23 @@ int main(int argc, char const *argv[])
 	// Esperamos a que terminen todos los procesos restantes
 	while (amount < original_amount)
 	{
-		wait(NULL);
-		amount++;
+		int status;
+		pid_t child_pid = waitpid(-1, &status, WNOHANG);
+		if(child_pid > 0){
+			ended_handler(child_pid, status);
+			amount = amount + 1;
+		}
 	}
 
 	// Escribimos en el outputfile
 	for (int i = 0; i < list_len; i++){
 		SonProcess* son = processlist_at_index(list, i);
-		int elapsed_time = son->time_ended - son->time_created;
-		fprintf(csv_file, "%s,%d,%d\n", son->executable, elapsed_time, son->status);
+		double elapsed_time = (double)(son->time_ended - son->time_created)/CLOCKS_PER_SEC;
+		fprintf(csv_file, "%s,%f,%d\n", son->executable, elapsed_time, son->status);
+		printf("Elapsed time process %d: %f\n", i+1, elapsed_time);
 	}
 
-	// ----------------------------
-	// ----------------------------
-	// ----------------------------
-	// -------------- BORRAR CODIGO
-	// ----------------------------
-	// ----------------------------
-	// ----------------------------
-	for(int i = 0; i < list_len; i++){
-		SonProcess* son = processlist_at_index(list, i);
-		printf("End_time process %d: %ld\n", i, son->time_ended);
-	};
-
+	printf("Entro: %d a la señal\n", count);
 	fclose(csv_file);
 	input_file_destroy(input_file);
 	processlist_destroy(list);

@@ -7,9 +7,8 @@ typedef struct son_process {
 
     int pid;
     char* executable;
-    bool ended;
-    time_t time_created;
-    time_t time_ended;
+    double time_created;
+    double time_ended;
     int status;
 
 } SonProcess ;
