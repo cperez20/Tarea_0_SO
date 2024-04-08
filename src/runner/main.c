@@ -25,9 +25,11 @@ void execute_external_program(char **arguments, bool first_process)
 	}
 	else if (pid == 0) // Si devuelve 0 es porque estamos en el proceso hijo
 	{
-		execvp(arguments[0], arguments); // Se ejecuta el programa externo
-		perror("Exec failed");			 // Si execvp retorna, hubo un error
-		exit(EXIT_FAILURE);
+		if (execvp(arguments[0], arguments) == -1) {
+            // Si execvp retorna, entonces hubo un error.
+            perror("Exec failed");
+            exit(EXIT_FAILURE);
+        }
 	} else{
 		time_t son_created = time(NULL); // Obtenemos hora de creacion
 		SonProcess process; // Pedimos memoria para el struct
@@ -112,7 +114,7 @@ int main(int argc, char const *argv[])
 	int amount = atoi(argv[3]);
 	int original_amount = amount; // Guardamos variable de amount que no cambiara
 	int max = (argc > 4) ? atoi(argv[4]) : -1; // Valor por defecto: tiempo ilimitado
-	bool first_process = false; // Registra si el primer proceso ya empezo (nos sirve para inicializar la lista ligada)
+	bool first_process = true; // Registra si el primer proceso ya empezo (nos sirve para inicializar la lista ligada)
 
 	signal(SIGCHLD, child_termination_handler);  // Funcion que se activara cada vez que termine un proceso hijo
 
@@ -149,10 +151,9 @@ int main(int argc, char const *argv[])
 				wait(NULL);
 				amount++;
 			}
-			if (first_process == false){
-				first_process = true;
-			}
 			execute_external_program(arguments, first_process);
+			first_process = false;
+			
 			amount--; // Decrementamos el contador de procesos permitidos
 		}
 		else
@@ -189,9 +190,10 @@ int main(int argc, char const *argv[])
     		}
 
 			// Volvemos a setear la alarma global
-			time_t new_seconds = time(NULL) - set_time;
-			alarm(new_seconds);
-			wait_alarm = false;
+			if(wait_alarm){
+				time_t new_seconds = time(NULL) - set_time;
+				alarm(new_seconds);
+				wait_alarm = false;}
 
     		// Después de alcanzar el timeout, asegúrate de que todos los procesos hijo sean recogidos (evita procesos zombis)
     		while (waitpid(-1, NULL, 0) > 0);
@@ -209,10 +211,21 @@ int main(int argc, char const *argv[])
 	// Escribimos en el outputfile
 	for (int i = 0; i < list_len; i++){
 		SonProcess* son = processlist_at_index(list, i);
-		printf("Time ended: %ld", son->time_ended);
 		int elapsed_time = son->time_ended - son->time_created;
 		fprintf(csv_file, "%s,%d,%d\n", son->executable, elapsed_time, son->status);
 	}
+
+	// ----------------------------
+	// ----------------------------
+	// ----------------------------
+	// -------------- BORRAR CODIGO
+	// ----------------------------
+	// ----------------------------
+	// ----------------------------
+	for(int i = 0; i < list_len; i++){
+		SonProcess* son = processlist_at_index(list, i);
+		printf("End_time process %d: %ld\n", i, son->time_ended);
+	};
 
 	fclose(csv_file);
 	input_file_destroy(input_file);
