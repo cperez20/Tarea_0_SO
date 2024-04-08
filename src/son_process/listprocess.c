@@ -4,7 +4,7 @@
 #include "process.h"
 
 // Definimos el inicializador de la lista, recibe el valor a guardar
-ProcessList* processlist_init(SonProcess* value)
+ProcessList* processlist_init(SonProcess value)
 {
   // Pedimos memoria para la lista
   ProcessList* list = malloc(sizeof(ProcessList));
@@ -20,7 +20,7 @@ ProcessList* processlist_init(SonProcess* value)
 }
 
 // Definimos una funcion para agregar un valor a la lista
-void processlist_append(ProcessList* list, SonProcess* value)
+void processlist_append(ProcessList* list, SonProcess value)
 {
   // Aqui podemos apreciar la utilidad de esta modelacion, el código queda
   // super ordenado y legible
@@ -49,12 +49,18 @@ SonProcess* processlist_at_index(ProcessList* list, int index)
   }
 
   // Retornamos el valor
-  return node->value;
+  return &node->value;
 }
 
 // Definimos el destructor de la lista
 void processlist_destroy(ProcessList *list)
 {
+
+  if (list == NULL)
+  {
+    return;
+  }
+
   // Si hay un nodo en la sig posicion, llamamos recursivamente a la funcion
   if (list->next)
   {
