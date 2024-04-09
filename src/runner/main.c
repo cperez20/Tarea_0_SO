@@ -10,6 +10,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <math.h>
 
 ProcessList *list; // lista que contendra a los procesos hijos
 int list_len = 0;
@@ -261,9 +262,9 @@ int main(int argc, char const *argv[])
 	for (int i = 0; i < list_len; i++)
 	{
 		SonProcess *son = processlist_at_index(list, i);
-		double elapsed_time = (double)(son->time_ended - son->time_created) / CLOCKS_PER_SEC;
-		fprintf(csv_file, "%s,%f,%d\n", son->executable, elapsed_time, son->status);
-		printf("Elapsed time process %d: %f\n", i + 1, elapsed_time);
+		int elapsed_time = (int)round(son->time_ended - son->time_created) / CLOCKS_PER_SEC;
+		fprintf(csv_file, "%s,%d,%d\n", son->executable, elapsed_time, son->status);
+		printf("Elapsed time process %d: %d\n", i + 1, elapsed_time);
 	}
 
 	printf("Entro: %d a la señal\n", count);
