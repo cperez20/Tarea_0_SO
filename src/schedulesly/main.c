@@ -10,7 +10,7 @@
 ProcessList2 *list;
 
 // Funcion para crear procesos
-Process create_process(pid_t pid_so, int father_pid, int NH, int gid, bool first_group_process, bool first_general_process, FILE* txt_file, double time_so, int num_linea, int arg){
+Process create_process(pid_t pid_so, int father_pid, int NH, int gid, bool first_group_process, bool first_general_process, FILE* txt_file, int time_so, int num_linea, int arg){
 
 	Process process;
 
@@ -28,7 +28,6 @@ Process create_process(pid_t pid_so, int father_pid, int NH, int gid, bool first
 	else
 	{
 		int pid_process = (int)(pid - pid_so);
-		int time_process = (int)round((double)clock() - time_so)/CLOCKS_PER_SEC;
 		if(NH != 0){
 			if(first_group_process){
 				gid = pid_process;
@@ -42,7 +41,7 @@ Process create_process(pid_t pid_so, int father_pid, int NH, int gid, bool first
 		} else{
 			processlist2_append(list, process);
 		}
-		fprintf(txt_file, "ENTER %d %d %d TIME %d LINE %d ARG %d", pid_process, father_pid, gid, time_process, num_linea, arg);
+		fprintf(txt_file, "ENTER %d %d %d TIME %d LINE %d ARG %d", pid_process, father_pid, gid, time_so, num_linea, arg);
 	}
 
 }
@@ -58,7 +57,7 @@ int main(int argc, char const *argv[])
 	int qdelta = atoi(input_file->lines[0][1]);
 	int qmin = atoi(input_file->lines[0][2]);
 	pid_t pid_so = getpid();
-	double time_so = clock();
+	int time_so = 0;
 
 	printf("K líneas: %d\n", input_file->len);
 	printf("qstart: %d - qdelta: %d - qmin: %d\n", atoi(input_file->lines[0][0]), atoi(input_file->lines[0][1]), atoi(input_file->lines[0][2]));
@@ -79,9 +78,12 @@ int main(int argc, char const *argv[])
 		} else {
 			Process first_group_process = create_process(pid_so, 0, NH, 0, true, false, txt_file, time_so, i, 1);
 		}
+
 		// Empezamos a leer los hijos
-		for(int j = 3; j < len_line; j++){
-			// Logica procesos
+		int j = 3; // Para leer el resto de los valores de la linea
+		while(j < len_line){
+			int CI_subprocess = atoi(line[j]);
+			int NH_subprocess = atoi(line[j + 1]);
 		}
 	}
 
