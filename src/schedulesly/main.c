@@ -37,6 +37,13 @@ Process create_process(pid_t pid_so, int father_pid, int NH, int gid, bool first
 			} else {
 				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = gid, .status = "WAITING"};
 			}
+		} else {
+			if(first_group_process){
+				gid = pid_process;
+				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = pid_process, .status = ""};
+			} else {
+				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = gid, .status = ""};
+			}
 		}
 		if(first_general_process){
 			list = processlist2_init(process);
@@ -65,6 +72,7 @@ int main(int argc, char const *argv[])
 	int inrow_len_groups_list = 0;
 	bool first_group = true; // Para verificar si es el primer grupo en unirse a la cola
 	bool first_process = true; // Para verificar si es el primer proceso que se crea
+	bool group_active = false; // Me dice si hay algun grupo activo en ese momento
 
 
 
@@ -109,26 +117,42 @@ int main(int argc, char const *argv[])
 			}
 		}
 
-		// Iteramos sobre los grupos en cola
 		for(int i = 0; i < inrow_len_groups_list; i++){
 			Group* group = groupslist_at_index(inrow_groups_list, i);
-			if(group->active == false && group->finished == false){
+			if(group_active){
+				// Realizamos trabajo del grupo_activo
+			} else if(group->finished == false){
 				int len_line = sizeof(input_file->lines[group->line])/sizeof(input_file->lines[group->line][0]);
 				char **line = input_file->lines[group->line];
-				// Para acceder a los valores de esa linea la referenciamos directamente
 				int TI = atoi(line[0]);
+				bool is_the_lowest = true; // Variable para saber si es el con menor tiempo de llegada
+				for(int j = 0; j < inrow_len_groups_list; j++){ 
+					Group* group_time_revision = groupslist_at_index(inrow_groups_list, i);
+					if(group_time_revision->finished == false){
+						int TI_revision = atoi(input_file->lines[group_time_revision->line][0]);
+						if(TI_revision < TI){
+							is_the_lowest = false;
+							break;
+						}
+					}
+				}
+				if(is_the_lowest == false){ // Si no es el con menor tiempo de llegada, continuamos
+					continue;
+				}
 				int CI = atoi(line[1]);
 				int NH = atoi(line[2]);
 				int CF = atoi(line[len_line - 1]);
 				time_so = time_so + TI;
 				// Verificamos si es el primer proceso de todos para inicializar lista
 				if(first_process){
-					Process first_group_process = create_process(pid_so, 0, NH, 0, true, true, txt_file, time_so, i, 1);
+					Process first_group_process = create_process(pid_so, 0, NH, 0, true, true, txt_file, time_so, group->line, 1);
 					first_process = false;
 				} else {
-					Process first_group_process = create_process(pid_so, 0, NH, 0, true, false, txt_file, time_so, i, 1);
+					Process first_group_process = create_process(pid_so, 0, NH, 0, true, false, txt_file, time_so, group->line, 1);
 				}
+				group_active = true; // Indicamos que esta procesando
 				group->finished = true; // Para que termine por mientras
+
 			}
 		}
 
