@@ -72,6 +72,7 @@ int main(int argc, char const *argv[])
 		int CI = atoi(line[1]);
 		int NH = atoi(line[2]);
 		int CF = atoi(line[len_line - 1]);
+		time_so = time_so + TI;
 		// Verificamos si es el primer proceso de todos para inicializar lista
 		if(i == 1){
 			Process first_group_process = create_process(pid_so, 0, NH, 0, true, true, txt_file, time_so, i, 1);
