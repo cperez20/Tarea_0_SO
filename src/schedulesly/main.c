@@ -58,21 +58,30 @@ int main(int argc, char const *argv[])
 	int qmin = atoi(input_file->lines[0][2]);
 	pid_t pid_so = getpid();
 	int time_so = 0;
+	int times_array[input_file->len - 1]; // Array que contendra a todas las lineas de info
+
 
 	printf("K líneas: %d\n", input_file->len);
 	printf("qstart: %d - qdelta: %d - qmin: %d\n", atoi(input_file->lines[0][0]), atoi(input_file->lines[0][1]), atoi(input_file->lines[0][2]));
+
+	// Guardamos todos los tiempos de inicio de los distintos grupos
+	for (int i = 1; i < input_file->len; ++i){
+		times_array[i - 1] = atoi(input_file->lines[i][0]);
+	}
+
 	for (int i = 1; i < input_file->len; ++i)
 	{
 		printf("TI: %d - CI: %d - NH: %d - CF: %d\n", atoi(input_file->lines[i][0]), atoi(input_file->lines[i][1]), atoi(input_file->lines[i][2]), atoi(input_file->lines[i][3]));
 		// Encontramos el largo de la linea del input para poder iterar en este
 		int len_line = sizeof(input_file->lines[i])/sizeof(input_file->lines[i][0]);
 		// Para acceder a los valores de esa linea la referenciamos directamente
-		char **line = input_file->lines[i];
+		char **line = input_file->lines[i];;
 		int TI = atoi(line[0]);
 		int CI = atoi(line[1]);
 		int NH = atoi(line[2]);
 		int CF = atoi(line[len_line - 1]);
 		time_so = time_so + TI;
+
 		// Verificamos si es el primer proceso de todos para inicializar lista
 		if(i == 1){
 			Process first_group_process = create_process(pid_so, 0, NH, 0, true, true, txt_file, time_so, i, 1);
@@ -83,8 +92,7 @@ int main(int argc, char const *argv[])
 		// Empezamos a leer los hijos
 		int j = 3; // Para leer el resto de los valores de la linea
 		while(j < len_line){
-			int CI_subprocess = atoi(line[j]);
-			int NH_subprocess = atoi(line[j + 1]);
+			// Logica
 		}
 	}
 
