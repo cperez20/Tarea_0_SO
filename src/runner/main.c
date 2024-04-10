@@ -83,7 +83,6 @@ void child_termination_handler(int sig)
 
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
 	{
-		amount++;
 		count++;
 
 		for (int i = 0; i < list_len; i++)
@@ -114,7 +113,8 @@ void sigterm_handler(int sig)
 	if (pid != 0)
 	{
 		printf("10 segs alcanzado. Enviando SIGTERM a todos los procesos restantes.\n");
-		kill(-1, SIGTERM);
+		kill(0, SIGTERM);
+		signal(SIGCHLD, ended_handler);
 	}
 }
 
@@ -152,6 +152,7 @@ int main(int argc, char const *argv[])
 	bool first_process = true;				   // Registra si el primer proceso ya empezo (nos sirve para inicializar la lista ligada)
 
 	signal(SIGCHLD, child_termination_handler); // Funcion que se activara cada vez que termine un proceso hijo
+	signal(SIGTERM, sigterm_handler);
 
 	// Si max tiene un valor distinto de 1 se le asigna ese valor a la alarma
 	if (max != -1)
@@ -184,8 +185,14 @@ int main(int argc, char const *argv[])
 			// Si se ha alcanzado el límite de procesos permitidos, esperamos a que termine uno
 			while (amount == 0)
 			{
-				wait(NULL);
-				amount = amount + 1;
+				int status;
+				pid_t child_pid = waitpid(-1, &status, WNOHANG);
+				if (child_pid > 0)
+				{
+					printf("Entró child pid %i\n", child_pid);
+					ended_handler(child_pid, status);
+					amount = amount + 1;
+				}
 			}
 			execute_external_program(arguments, first_process);
 			first_process = false;
