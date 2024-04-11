@@ -40,6 +40,24 @@ Process create_process(int pid_process, int father_pid, int NH, int gid, bool fi
 
 }
 
+int work_group(char **line, int len_line, Group* group){
+
+	int work_units; // Unidades a trabajar en esta ejecucion
+	if(group->work_units <= group->work_units_to_process ){
+		int work_units = group->work_units;
+	} else {
+		int work_units = group->work_units_to_process;
+	}
+
+	for(int i = group->arg_en_ejecucion; i < len_line; i++){ // Partimos desde donde quedo
+		if(i == len_line - 1){
+			// Logica 
+			break;
+		}
+	}
+
+}
+
 int main(int argc, char const *argv[])
 {
 	/*Lectura del input: ./testsT0/P2/inputs/in01.txt */
@@ -70,7 +88,7 @@ int main(int argc, char const *argv[])
 		printf("TI: %d - CI: %d - NH: %d - CF: %d\n", atoi(input_file->lines[i][0]), atoi(input_file->lines[i][1]), atoi(input_file->lines[i][2]), atoi(input_file->lines[i][3]));
 		// Unimos a los grupos
 		Group group;
-		group = (Group){.start_time = atoi(input_file->lines[i][0]) , .active = false, .finished = false, .line = i, .added_before = false};
+		group = (Group){.start_time = atoi(input_file->lines[i][0]) , .active = false, .finished = false, .line = i, .added_before = false, .work_units = qstart, .work_units_to_process = 0, .arg_en_ejecucion = 1};
 		if(first_group){
 			groups_list = groupslist_init(group);
 			first_group = false;
@@ -92,7 +110,7 @@ int main(int argc, char const *argv[])
 			Group* group = groupslist_at_index(groups_list, i);
 			if(group->start_time <= time_so && group->added_before == false ){
 				Group group_to_insert;
-				group_to_insert = (Group){.start_time = group->start_time , .active = group->active, .finished = group->finished, .line = group->line, .added_before = true};
+				group_to_insert = (Group){.start_time = group->start_time , .active = group->active, .finished = group->finished, .line = group->line, .added_before = true, .work_units = qstart, .work_units_to_process = 0, .arg_en_ejecucion = 1};
 				if(first_group){
 					inrow_groups_list = groupslist_init(group_to_insert);
 					first_group = false; 
@@ -126,6 +144,10 @@ int main(int argc, char const *argv[])
 				if(is_the_lowest == false){ // Si no es el con menor tiempo de llegada, continuamos
 					continue;
 				}
+				if(time_so < TI){ // Verificamos si el SO debe entrar en estado IDLE
+					fprintf(txt_file, "IDLE %d\n", TI - time_so);
+					time_so = TI; // Avanza hasta el tiempo del nuevo proceso 
+				}
 				int CI = atoi(line[1]);
 				int NH = atoi(line[2]);
 				int CF = atoi(line[len_line - 1]);
@@ -137,8 +159,16 @@ int main(int argc, char const *argv[])
 				} else {
 					Process first_group_process = create_process(pid_process, 0, NH, 0, true, false, txt_file, time_so, group->line, 1);
 				}
+				group->work_units_to_process = CI; // Seteamos el primer tiempo a las unidades para procesar
 				pid_process = pid_process + 1;
+				group->active = true;
 				group_active = true; // Indicamos que esta procesando
+				// Contamos la cantidad de unidades de trabajo restantes
+				if(len_line > 4){ // Verificamos que no sea solo un proceso
+					for(int j = 3; j < len_line; j++){
+						// Lógica
+					}
+				}			
 				group->finished = true; // Para que termine por mientras
 
 
