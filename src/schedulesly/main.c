@@ -88,16 +88,18 @@ int main(int argc, char const *argv[])
 		group = (Group){.start_time = atoi(input_file->lines[i][0]) , .active = false, .finished = false, .line = i, .added_before = false};
 		if(first_group){
 			groups_list = groupslist_init(group);
+			first_group = false;
 		} else{
 			groupslist_append(groups_list, group);
 			}
 	}
 
+	first_group = true; // Reusamos la variable
+
 	// Empezamos la ejecucion del programa
 	while(true){
 
 		bool end_program = true;
-
 
 
 		// Revisamos todos los tiempos de los grupos
@@ -155,6 +157,11 @@ int main(int argc, char const *argv[])
 
 			}
 		}
+
+		// Iniciamos Reporte
+		fprintf(txt_file, "REPORT START\n");
+		fprintf(txt_file, "TIME %d\n", (int)(time_so));
+		fprintf(txt_file, "REPORT END\n");
 
 		// Verificamos si se debe terminar el programa
 		if(inrow_len_groups_list == input_file->len - 1){
