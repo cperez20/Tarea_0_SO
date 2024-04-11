@@ -10,6 +10,8 @@
 #include <time.h>
 
 ProcessList2 *list;
+int time_so = 0; // Tiempo sistema operativo
+bool its_ci = true; // Nos indica si estabamos leyendo un CI (sino era un CE)
 
 // Funcion para crear procesos
 Process create_process(int pid_process, int father_pid, int NH, int gid, bool first_group_process, bool first_general_process, FILE* txt_file, int time_so, int num_linea, int arg){
@@ -40,7 +42,10 @@ Process create_process(int pid_process, int father_pid, int NH, int gid, bool fi
 
 }
 
-int work_group(char **line, int len_line, Group* group){
+bool work_group(FILE *txt_file, char **line, int len_line, Group* group){
+
+	bool group_finish = false; // Nos indica si un grupo termino de ejecutarse
+	bool new_enter = true; // Nos indica si recien se entro a trabajar denuevo
 
 	int work_units; // Unidades a trabajar en esta ejecucion
 	if(group->work_units <= group->work_units_to_process ){
@@ -50,11 +55,29 @@ int work_group(char **line, int len_line, Group* group){
 	}
 
 	for(int i = group->arg_en_ejecucion; i < len_line; i++){ // Partimos desde donde quedo
-		if(i == len_line - 1){
-			// Logica 
+		if(i == len_line - 1){ // Ultimo CF
+			if(group->work_units >= group->work_units_to_process){
+				time_so = time_so + atoi(line[i]);
+				group_finish = true; // Un grupo termina
+			}
 			break;
 		}
+		// Verificamos si la entrada es CI o CE (sino sera CF que ya se maneja arriba)
+		if(new_enter){
+			if(its_ci && group->work_units > 0 ){
+				if(group->left_time == 0){
+					int work_time = atoi(line[i]);
+					fprintf(txt_file, "RUN %d %d\n", 1, atoi(line[i]));
+					time_so = time_so + atoi(line[i]);
+				}
+			}
+			new_enter = false;
+		}
+		
+
 	}
+
+	return group_finish;
 
 }
 
@@ -69,7 +92,6 @@ int main(int argc, char const *argv[])
 	int qdelta = atoi(input_file->lines[0][1]);
 	int qmin = atoi(input_file->lines[0][2]);
 	int pid_process = 1;
-	int time_so = 0;
 	GroupsList *groups_list;
 	GroupsList *inrow_groups_list;
 	int inrow_len_groups_list = 0;
@@ -110,7 +132,7 @@ int main(int argc, char const *argv[])
 			Group* group = groupslist_at_index(groups_list, i);
 			if(group->start_time <= time_so && group->added_before == false ){
 				Group group_to_insert;
-				group_to_insert = (Group){.start_time = group->start_time , .active = group->active, .finished = group->finished, .line = group->line, .added_before = true, .work_units = qstart, .work_units_to_process = 0, .arg_en_ejecucion = 1};
+				group_to_insert = (Group){.start_time = group->start_time , .active = group->active, .finished = group->finished, .line = group->line, .added_before = true, .work_units = qstart, .work_units_to_process = 0, .arg_en_ejecucion = 1, .left_time = 0};
 				if(first_group){
 					inrow_groups_list = groupslist_init(group_to_insert);
 					first_group = false; 
@@ -127,7 +149,15 @@ int main(int argc, char const *argv[])
 			if(group_active){
 				// Realizamos trabajo del grupo_activo
 			} else if(group->finished == false){
-				int len_line = sizeof(input_file->lines[group->line])/sizeof(input_file->lines[group->line][0]);
+				int len_line = 0;
+				// Calculamos el largo de la linea
+				for(int j = 0; j < MAX_SPLIT; j++){
+					if(input_file->lines[group->line][j] != NULL){
+						len_line = len_line + 1;
+					} else{
+						break;
+					}
+				}
 				char **line = input_file->lines[group->line];
 				int TI = atoi(line[0]);
 				bool is_the_lowest = true; // Variable para saber si es el con menor tiempo de llegada
@@ -163,13 +193,7 @@ int main(int argc, char const *argv[])
 				pid_process = pid_process + 1;
 				group->active = true;
 				group_active = true; // Indicamos que esta procesando
-				// Contamos la cantidad de unidades de trabajo restantes
-				if(len_line > 4){ // Verificamos que no sea solo un proceso
-					for(int j = 3; j < len_line; j++){
-						// Lógica
-					}
-				}			
-				group->finished = true; // Para que termine por mientras
+				group->finished =  work_group(txt_file,line, len_line, group);			
 
 
 			}

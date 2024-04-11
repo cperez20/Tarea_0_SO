@@ -11,6 +11,7 @@ typedef struct group{
     bool added_before;
     int work_units; // Unidades de trabajo que le quedan al grupo
     int work_units_to_process; // Unidades que debe procesar el grupo para terminar
-    int arg_en_ejecucion // Indica que argumento esta en ejecucion en ese momento
+    int arg_en_ejecucion; // Indica que argumento esta en ejecucion en ese momento
+    int left_time; // 0 indica que ningun CI, CE o CF quedo en ejecucion
 
 } Group;
