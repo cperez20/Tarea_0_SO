@@ -12,46 +12,31 @@
 ProcessList2 *list;
 
 // Funcion para crear procesos
-Process create_process(pid_t pid_so, int father_pid, int NH, int gid, bool first_group_process, bool first_general_process, FILE* txt_file, int time_so, int num_linea, int arg){
+Process create_process(int pid_process, int father_pid, int NH, int gid, bool first_group_process, bool first_general_process, FILE* txt_file, int time_so, int num_linea, int arg){
 
 	Process process;
 
-	pid_t pid = fork();
-
-	if (pid < 0) // Si fork devuelve un numero negativo, hubo un error creando al hijo
-	{
-		perror("Fork failed");
-		exit(EXIT_FAILURE);
-	}
-	else if (pid == 0) // Si devuelve 0 es porque estamos en el proceso hijo
-	{
-		// Logica dentro del hijo
-	}
-	else
-	{
-		int pid_process = (int)(pid - pid_so);
-		if(NH != 0){
-			if(first_group_process){
-				gid = pid_process;
-				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = pid_process, .status = "WAITING"};
-			} else {
-				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = gid, .status = "WAITING"};
-			}
+	if(NH != 0){
+		if(first_group_process){
+			gid = pid_process;
+			process = (Process){.pid = pid_process, .ppid = father_pid, .gid = pid_process, .status = "WAITING"};
 		} else {
-			if(first_group_process){
-				gid = pid_process;
-				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = pid_process, .status = ""};
-			} else {
-				process = (Process){.pid = pid_process, .ppid = father_pid, .gid = gid, .status = ""};
-			}
+			process = (Process){.pid = pid_process, .ppid = father_pid, .gid = gid, .status = "WAITING"};
 		}
-		if(first_general_process){
-			list = processlist2_init(process);
-		} else{
-			processlist2_append(list, process);
+	} else {
+		if(first_group_process){
+			gid = pid_process;
+			process = (Process){.pid = pid_process, .ppid = father_pid, .gid = pid_process, .status = ""};
+		} else {
+			process = (Process){.pid = pid_process, .ppid = father_pid, .gid = gid, .status = ""};
 		}
-		fprintf(txt_file, "ENTER %d %d %d TIME %d LINE %d ARG %d\n", pid_process, father_pid, gid, time_so, num_linea, arg);
 	}
+	if(first_general_process){
+		list = processlist2_init(process);
+	} else{
+		processlist2_append(list, process);
+	}
+	fprintf(txt_file, "ENTER %d %d %d TIME %d LINE %d ARG %d\n", pid_process, father_pid, gid, time_so, num_linea, arg);	
 
 }
 
@@ -65,7 +50,7 @@ int main(int argc, char const *argv[])
 	int qstart = atoi(input_file->lines[0][0]);
 	int qdelta = atoi(input_file->lines[0][1]);
 	int qmin = atoi(input_file->lines[0][2]);
-	pid_t pid_so = getpid();
+	int pid_process = 1;
 	int time_so = 0;
 	GroupsList *groups_list;
 	GroupsList *inrow_groups_list;
@@ -147,13 +132,15 @@ int main(int argc, char const *argv[])
 				time_so = time_so + TI;
 				// Verificamos si es el primer proceso de todos para inicializar lista
 				if(first_process){
-					Process first_group_process = create_process(pid_so, 0, NH, 0, true, true, txt_file, time_so, group->line, 1);
+					Process first_group_process = create_process(pid_process, 0, NH, 0, true, true, txt_file, time_so, group->line, 1);
 					first_process = false;
 				} else {
-					Process first_group_process = create_process(pid_so, 0, NH, 0, true, false, txt_file, time_so, group->line, 1);
+					Process first_group_process = create_process(pid_process, 0, NH, 0, true, false, txt_file, time_so, group->line, 1);
 				}
+				pid_process = pid_process + 1;
 				group_active = true; // Indicamos que esta procesando
 				group->finished = true; // Para que termine por mientras
+
 
 			}
 		}
