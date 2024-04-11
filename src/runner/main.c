@@ -16,6 +16,7 @@ ProcessList *list; // lista que contendra a los procesos hijos
 int list_len = 0;
 int amount;
 int count = 0;
+int term_process = 0;
 
 void execute_external_program(char **arguments, bool first_process)
 {
@@ -55,13 +56,15 @@ void execute_external_program(char **arguments, bool first_process)
 
 void ended_handler(pid_t son_pid, int status)
 {
-
+	amount = amount + 1;
 	for (int i = 0; i < list_len; i++)
 	{
 		SonProcess *son = processlist_at_index(list, i);
 		if (son->pid == son_pid)
 		{							   // Encontramos al proceso que acaba de terminar
 			son->time_ended = clock(); // Asignamos valor a ended
+			int elapsed_time = (int)round(son->time_ended - son->time_created) / CLOCKS_PER_SEC;
+			printf("SE TERMINO EL PROCESO %d A LOS %d\n", son_pid, elapsed_time);
 			// Asignamos valor a status
 			if (WIFEXITED(status))
 			{
@@ -81,16 +84,18 @@ void child_termination_handler(int sig)
 	int status;
 	pid_t pid;
 
-	while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+	pid = waitpid(-1, &status, WNOHANG);
+	if (pid > 0)
 	{
-		count++;
-
 		for (int i = 0; i < list_len; i++)
 		{
 			SonProcess *son = processlist_at_index(list, i);
 			if (son->pid == pid)
 			{
 				son->time_ended = clock();
+				amount = amount + 1;
+				int elapsed_time = (int)round(son->time_ended - son->time_created) / CLOCKS_PER_SEC;
+				printf("SE TERMINO EL PROCESO %d A LOS %d\n", pid, elapsed_time);
 				if (WIFEXITED(status))
 				{
 					son->status = WEXITSTATUS(status);
@@ -103,18 +108,18 @@ void child_termination_handler(int sig)
 			}
 		}
 	}
+	term_process = term_process + 1;
+	printf("SE SUMO UN PROCESO TERMINADO\n");
 }
 
-void sigterm_handler(int sig)
+void alarm_handler(int sig)
 {
-	int pid;
-	int status;
-	pid = waitpid(-1, &status, 0);
-	if (pid != 0)
+	printf("10 segs alcanzados. Enviando SIGTERM a todos los procesos restantes.\n");
+	for (int i = 0; i < list_len; i++)
 	{
-		printf("10 segs alcanzado. Enviando SIGTERM a todos los procesos restantes.\n");
-		kill(0, SIGTERM);
-		signal(SIGCHLD, ended_handler);
+		SonProcess *son = processlist_at_index(list, i);
+		kill(son->pid, SIGTERM);
+		signal(SIGTERM, child_termination_handler);
 	}
 }
 
@@ -125,14 +130,14 @@ void timeout_handler(int sig)
 	if (wait_alarm)
 	{
 		printf("Timeout alcanzado. Enviando SIGKILL a todos los procesos restantes.\n");
-		kill(-1, SIGKILL); // Termina todos los procesos hijo restantes
+		kill(-1, SIGKILL);
 	}
 	else
 	{
 		printf("Max alcanzado. Enviando SIGINT a todos los procesos restantes.\n");
 		kill(-1, SIGINT);
-		signal(SIGALRM, sigterm_handler); // Definimos nueva alarma
 		alarm(10);
+		signal(SIGALRM, alarm_handler);
 	}
 }
 
@@ -152,7 +157,6 @@ int main(int argc, char const *argv[])
 	bool first_process = true;				   // Registra si el primer proceso ya empezo (nos sirve para inicializar la lista ligada)
 
 	signal(SIGCHLD, child_termination_handler); // Funcion que se activara cada vez que termine un proceso hijo
-	signal(SIGTERM, sigterm_handler);
 
 	// Si max tiene un valor distinto de 1 se le asigna ese valor a la alarma
 	if (max != -1)
@@ -191,7 +195,6 @@ int main(int argc, char const *argv[])
 				{
 					printf("Entró child pid %i\n", child_pid);
 					ended_handler(child_pid, status);
-					amount = amount + 1;
 				}
 			}
 			execute_external_program(arguments, first_process);
@@ -259,9 +262,7 @@ int main(int argc, char const *argv[])
 		pid_t child_pid = waitpid(-1, &status, WNOHANG);
 		if (child_pid > 0)
 		{
-			printf("Entró child pid %i\n", child_pid);
 			ended_handler(child_pid, status);
-			amount = amount + 1;
 		}
 	}
 
@@ -274,7 +275,6 @@ int main(int argc, char const *argv[])
 		printf("Elapsed time process %d: %d\n", i + 1, elapsed_time);
 	}
 
-	printf("Entro: %d a la señal\n", count);
 	fclose(csv_file);
 	input_file_destroy(input_file);
 	processlist_destroy(list);
