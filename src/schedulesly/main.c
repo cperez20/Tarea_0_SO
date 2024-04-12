@@ -65,6 +65,7 @@ bool work_group(FILE *txt_file, char **line, int len_line, Group* group, Process
 			if(group->work_units >= group->work_units_to_process){
 				time_so = time_so + atoi(line[i]);
 				group_finish = true; // Un grupo termina
+				group->gid = 0; // pues termino el grupo
 			}
 			break;
 		}
@@ -91,6 +92,7 @@ bool work_group(FILE *txt_file, char **line, int len_line, Group* group, Process
 				fprintf(txt_file, "END %d TIME %d\n", process->pid, time_so);
 				process->ended_before = true;
 				process->status = "FINISHED";
+				process->gid = 0;
 			}
 		}
 		
@@ -218,7 +220,10 @@ int main(int argc, char const *argv[])
 				pid_process = pid_process + 1;
 				group->active = true;
 				group_active = true; // Indicamos que esta procesando
-				group->finished =  work_group(txt_file,line, len_line, group, process_active);			
+				group->finished =  work_group(txt_file,line, len_line, group, process_active);
+				if(group->finished){
+					original_group->gid = 0; // Por mientras
+				}			
 
 
 			}
