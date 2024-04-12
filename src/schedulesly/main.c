@@ -14,6 +14,7 @@ int len_list;
 int time_so = 0; // Tiempo sistema operativo
 bool its_ci = true; // Nos indica si estabamos leyendo un CI (sino era un CE)
 Process* process_active; // Proceso que actualmente esta activo
+GroupsList *groups_list; // Contiene a todos los grupos
 
 // Funcion para crear procesos
 Process create_process(int pid_process, int father_pid, int NH, int gid, bool first_group_process, bool first_general_process, FILE* txt_file, int time_so, int num_linea, int arg, Group* group){
@@ -89,6 +90,9 @@ bool work_group(FILE *txt_file, char **line, int len_line, Group* group, Process
 		for(int i = 0; i < len_list; i++){
 			Process *process = processlist2_at_index(list, 0);
 			if(process->ended && process->ended_before == false && process->gid == group->gid){
+				Group *group_0 = groupslist_at_index(groups_list, 0);
+				group_0->num_process = group_0->num_process + 1;
+				group->num_process = group->num_process - 1;
 				fprintf(txt_file, "END %d TIME %d\n", process->pid, time_so);
 				process->ended_before = true;
 				process->status = "FINISHED";
@@ -114,7 +118,6 @@ int main(int argc, char const *argv[])
 	int qdelta = atoi(input_file->lines[0][1]);
 	int qmin = atoi(input_file->lines[0][2]);
 	int pid_process = 1;
-	GroupsList *groups_list;
 	GroupsList *inrow_groups_list;
 	int inrow_len_groups_list = 0;
 	bool first_group = true; // Para verificar si es el primer grupo en unirse a la cola
@@ -126,6 +129,11 @@ int main(int argc, char const *argv[])
 	printf("K líneas: %d\n", input_file->len);
 	printf("qstart: %d - qdelta: %d - qmin: %d\n", atoi(input_file->lines[0][0]), atoi(input_file->lines[0][1]), atoi(input_file->lines[0][2]));
 
+	// Creamos el grupo para los procesos que terminan
+	Group group;
+	group = (Group){.gid = 0, .num_process = 0, .added_before = true}; // Para no agregarlo a la cola el added_before = true
+	groups_list = groupslist_init(group);
+
 	// Rellenamos la lista de grupos
 	for (int i = 1; i < input_file->len; ++i)
 	{
@@ -133,15 +141,9 @@ int main(int argc, char const *argv[])
 		// Unimos a los grupos
 		Group group;
 		group = (Group){.start_time = atoi(input_file->lines[i][0]) , .active = false, .finished = false, .line = i, .added_before = false, .work_units = qstart, .work_units_to_process = 0, .arg_en_ejecucion = 1, .num_process = 0};
-		if(first_group){
-			groups_list = groupslist_init(group);
-			first_group = false;
-		} else{
-			groupslist_append(groups_list, group);
-			}
+		groupslist_append(groups_list, group);
+			
 	}
-
-	first_group = true; // Reusamos la variable
 
 	// Empezamos la ejecucion del programa
 	while(true){
@@ -150,7 +152,7 @@ int main(int argc, char const *argv[])
 
 
 		// Revisamos todos los tiempos de los grupos
-		for(int i = 0; i < input_file->len - 1; i++){
+		for(int i = 0; i < input_file->len; i++){
 			Group* group = groupslist_at_index(groups_list, i);
 			if(group->start_time <= time_so && group->added_before == false ){
 				Group group_to_insert;
@@ -221,11 +223,7 @@ int main(int argc, char const *argv[])
 				group->active = true;
 				group_active = true; // Indicamos que esta procesando
 				group->finished =  work_group(txt_file,line, len_line, group, process_active);
-				if(group->finished){
-					original_group->gid = 0; // Por mientras
-				}			
-
-
+				original_group->num_process = group->num_process; // Cambiamos valor importante para el reporte			
 			}
 		}
 
