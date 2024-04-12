@@ -12,26 +12,27 @@
 #include <errno.h>
 #include <math.h>
 
-ProcessList *list; // lista que contendra a los procesos hijos
+ProcessList *list;
 int list_len = 0;
 int amount;
 int count = 0;
 int term_process = 0;
+bool wait_alarm = false;
 
 void execute_external_program(char **arguments, bool first_process)
 {
-	pid_t pid = fork(); // Se crea el proceso hijo como copia exacta del padre
+	pid_t pid = fork();
 
-	if (pid < 0) // Si fork devuelve un numero negativo, hubo un error creando al hijo
+	if (pid < 0)
 	{
 		perror("Fork failed");
 		exit(EXIT_FAILURE);
 	}
-	else if (pid == 0) // Si devuelve 0 es porque estamos en el proceso hijo
+	else if (pid == 0)
 	{
 		if (execvp(arguments[0], arguments) == -1)
 		{
-			// Si execvp retorna, entonces hubo un error.
+
 			perror("Exec failed");
 			exit(EXIT_FAILURE);
 		}
@@ -41,7 +42,7 @@ void execute_external_program(char **arguments, bool first_process)
 		double son_created = clock();																 // Obtenemos hora de creacion
 		SonProcess process;																			 // Pedimos memoria para el struct
 		process = (SonProcess){.pid = pid, .executable = arguments[0], .time_created = son_created}; // Inicializamos sus valores
-		// Analizamos si debemos inicializar la lista ligada o agregarle un valor
+
 		if (first_process)
 		{
 			list = processlist_init(process);
@@ -50,7 +51,7 @@ void execute_external_program(char **arguments, bool first_process)
 		{
 			processlist_append(list, process);
 		}
-		list_len = list_len + 1; // Aumentamos el largo de la lista
+		list_len = list_len + 1;
 	}
 }
 
@@ -61,11 +62,11 @@ void ended_handler(pid_t son_pid, int status)
 	{
 		SonProcess *son = processlist_at_index(list, i);
 		if (son->pid == son_pid)
-		{							   // Encontramos al proceso que acaba de terminar
-			son->time_ended = clock(); // Asignamos valor a ended
+		{
+			son->time_ended = clock();
 			int elapsed_time = (int)round(son->time_ended - son->time_created) / CLOCKS_PER_SEC;
 			printf("SE TERMINO EL PROCESO %d A LOS %d\n", son_pid, elapsed_time);
-			// Asignamos valor a status
+
 			if (WIFEXITED(status))
 			{
 				son->status = WEXITSTATUS(status);
@@ -123,8 +124,6 @@ void alarm_handler(int sig)
 	}
 }
 
-// Definimos variable para decidir si la alarma de wait esta activa o no
-bool wait_alarm = false;
 void timeout_handler(int sig)
 {
 	if (wait_alarm)
@@ -138,6 +137,45 @@ void timeout_handler(int sig)
 		kill(-1, SIGINT);
 		alarm(10);
 		signal(SIGALRM, alarm_handler);
+	}
+}
+
+void ctrlz_handler(int sig)
+{
+	int status;
+	pid_t pid;
+
+	pid = waitpid(-1, &status, WNOHANG);
+	if (pid > 0)
+	{
+		for (int i = 0; i < list_len; i++)
+		{
+			SonProcess *son = processlist_at_index(list, i);
+			if (son->pid == pid)
+			{
+				son->time_ended = clock();
+				amount = amount + 1;
+				int elapsed_time = (int)round(son->time_ended - son->time_created) / CLOCKS_PER_SEC;
+				printf("SE TERMINO EL PROCESO %d A LOS %d\n", pid, elapsed_time);
+				if (WIFEXITED(status))
+				{
+					son->status = WEXITSTATUS(status);
+				}
+				else if (WIFSIGNALED(status))
+				{
+					son->status = WTERMSIG(status);
+				}
+				break;
+			}
+		}
+	}
+	term_process = term_process + 1;
+	printf("SE SUMO UN PROCESO TERMINADO\n");
+	if (term_process < list_len)
+	{
+		alarm(10);
+		wait_alarm = true;
+		signal(SIGALRM, timeout_handler);
 	}
 }
 
@@ -156,13 +194,13 @@ int main(int argc, char const *argv[])
 	int max = (argc > 4) ? atoi(argv[4]) : -1; // Valor por defecto: tiempo ilimitado
 	bool first_process = true;				   // Registra si el primer proceso ya empezo (nos sirve para inicializar la lista ligada)
 
-	signal(SIGCHLD, child_termination_handler); // Funcion que se activara cada vez que termine un proceso hijo
+	signal(SIGCHLD, child_termination_handler);
+	signal(SIGTSTP, child_termination_handler);
 
-	// Si max tiene un valor distinto de 1 se le asigna ese valor a la alarma
 	if (max != -1)
 	{
 		signal(SIGALRM, timeout_handler);
-		alarm(max); // Configuramos un temporizador
+		alarm(max);
 	}
 
 	/*Mostramos el archivo de input en consola*/
@@ -183,10 +221,9 @@ int main(int argc, char const *argv[])
 
 		printf("\n");
 
-		// Ejecutamos el programa externo si no es un comando "wait_all"
 		if (strcmp(arguments[0], "wait_all") != 0)
 		{
-			// Si se ha alcanzado el límite de procesos permitidos, esperamos a que termine uno
+
 			while (amount == 0)
 			{
 				int status;
@@ -200,18 +237,17 @@ int main(int argc, char const *argv[])
 			execute_external_program(arguments, first_process);
 			first_process = false;
 
-			amount = amount - 1; // Decrementamos el contador de procesos permitidos
+			amount = amount - 1;
 		}
 		else
 		{
-			int timeout = atoi(arguments[1]); // Obtiene el timeout del comando wait_all
+			int timeout = atoi(arguments[1]);
 			pid_t pid;
 			int status;
 			time_t set_time;
 
-			// Obtén el tiempo restante de la alarma y cancela la alarma actual
 			unsigned int seconds_left = alarm(0);
-			// Si timeout se va a disparar antes que max se setea esa alarma
+
 			if (seconds_left > timeout)
 			{
 				set_time = time(NULL);
@@ -226,22 +262,20 @@ int main(int argc, char const *argv[])
 			while (true)
 			{
 
-				// Espera a cualquier proceso hijo hasta que uno termine o hasta que se alcance el timeout
-				pid = waitpid(-1, &status, 0); // 0 para bloquear hasta que un proceso hijo termine
+				pid = waitpid(-1, &status, 0);
 
 				if (pid > 0)
 				{
-					// Un proceso hijo ha terminado
+
 					printf("Proceso %d terminado.\n", pid);
 				}
 				else if (pid == -1)
 				{
-					// Error en waitpid o no hay más procesos hijo por esperar
+
 					break;
 				}
 			}
 
-			// Volvemos a setear la alarma global
 			if (wait_alarm)
 			{
 				time_t new_seconds = time(NULL) - set_time;
@@ -249,13 +283,11 @@ int main(int argc, char const *argv[])
 				wait_alarm = false;
 			}
 
-			// Después de alcanzar el timeout, asegúrate de que todos los procesos hijo sean recogidos (evita procesos zombis)
 			while (waitpid(-1, NULL, 0) > 0)
 				;
 		}
 	}
 
-	// Esperamos a que terminen todos los procesos restantes
 	while (amount < original_amount)
 	{
 		int status;
@@ -266,7 +298,6 @@ int main(int argc, char const *argv[])
 		}
 	}
 
-	// Escribimos en el outputfile
 	for (int i = 0; i < list_len; i++)
 	{
 		SonProcess *son = processlist_at_index(list, i);
